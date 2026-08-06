@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fiapx}
+    username: ${DATABASE_USERNAME:fiapx}
+    password: ${DATABASE_PASSWORD:fiapx}
+  jpa:
+    hibernate.ddl-auto: validate
+  flyway:
+    enabled: true
+server:
+  port: ${PORT:8081}
+app:
+  jwt-secret: ${JWT_SECRET:change-me-change-me-change-me-change-me-32}
+  jwt-expiration-minutes: ${JWT_EXPIRATION_MINUTES:60}
