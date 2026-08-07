@@ -7,5 +7,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '25' }
-      - run: mvn -B test
+      # verify, e não test: é na fase verify que o jacoco:check trava o build abaixo de 80%.
+      - run: mvn -B verify
       - run: docker build .

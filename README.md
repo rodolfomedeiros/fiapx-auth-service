@@ -115,13 +115,26 @@ Token ausente, malformado, expirado ou assinado com outra chave devolve
 
 ## Organização
 
-| Arquivo | Responsabilidade |
+Camadas no molde dos serviços do `gear-up`: as dependências apontam para dentro, e os casos
+de uso não conhecem Spring, JPA nem HTTP.
+
+```
+com.fiapx.auth/
+├── entities/       # User, TokenClaims e as exceções de domínio
+├── usecases/       # RegisterUser, AuthenticateUser, IntrospectToken + ports/
+├── controllers/    # AuthController: só traduz HTTP, com os DTOs de request e response
+├── gateways/       # Implementações das ports: JPA, BCrypt e JWT
+├── drivers/        # Repositório do Spring Data, SecurityConfig e a fiação dos casos de uso
+└── shared/         # GlobalExceptionHandler
+```
+
+| Ponto | Por quê |
 | :--- | :--- |
-| `AuthController.java` | Rotas de cadastro, login e introspecção |
-| `JwtService.java` | Emissão e verificação do token, desacoplado da entidade JPA |
-| `User.java` / `UserRepository.java` | Entidade e acesso à tabela `users` |
-| `SecurityConfig.java` | Cadeia de filtros do Spring Security |
-| `db/migration/V1__create_users.sql` | Migração Flyway da tabela `users` |
+| Handlers sem `@Service` | São Java puro, montados em `AuthUseCaseConfig`, e instanciáveis em teste sem subir contexto |
+| `UserRepository` é uma interface do domínio | O Spring Data mora no driver; `JpaUserRepository` faz a ponte |
+| Exceções de domínio, não `ResponseStatusException` | O `GlobalExceptionHandler` traduz para 409 e 401, e o domínio não precisa conhecer HTTP |
+| `User` é entidade e mapeamento ao mesmo tempo | Separá-los pediria um mapper para quatro campos que nunca divergem do schema |
+| Sem camada de presenters | Os DTOs de resposta são quatro records no controller; uma camada só para eles seria cerimônia |
 
 `spring.jpa.hibernate.ddl-auto` está em `validate`: a aplicação recusa subir se o schema
 encontrado não corresponder ao mapeamento, em vez de alterar o banco silenciosamente.
@@ -138,10 +151,23 @@ adicional.
 ## Testes
 
 ```sh
-mvn test
+mvn verify
 ```
 
-14 testes cobrindo emissão e verificação do token (expiração, assinatura adulterada,
-payload adulterado, token malformado), cadastro com e-mail duplicado, validação de payload
-e todas as respostas de introspecção. Não é necessário banco: o repositório é substituído
-por um mock e as rotas rodam em `MockMvc` standalone.
+35 testes cobrindo emissão e verificação do token (expiração, assinatura adulterada, payload
+adulterado, token malformado), cadastro com e-mail duplicado, normalização do e-mail,
+validação de payload e todas as respostas de introspecção. Não é necessário banco: a porta de
+repositório é substituída por um mock e as rotas rodam em `MockMvc` standalone.
+
+A separação em camadas rendeu testes mais diretos: as regras são exercitadas nos handlers,
+em JUnit puro, e o `MockMvc` ficou só com o que é de fato HTTP — status, formato da resposta
+e validação de entrada.
+
+`mvn verify` trava o build abaixo de **80% de cobertura de linhas**, via JaCoCo, como nos
+serviços do `gear-up`. Hoje o conjunto avaliado está em 91%. Ficam de fora `drivers/`, a
+classe de boot e as `@Configuration`: são fiação, e cobri-las exercitaria o Spring, não as
+regras.
+
+```sh
+open target/site/jacoco/index.html   # relatório detalhado
+```
